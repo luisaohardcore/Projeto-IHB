@@ -1,0 +1,25 @@
+Caches do Streamlit e Python
+
+pycache/
+*.py[cod]
+*$py.class
+.streamlit/
+static/
+
+Ambientes Virtuais
+
+.venv/
+venv/
+ENV/
+env/
+
+Arquivos de cache e log da aplicação
+
+cache_v.json
+*.log
+
+Arquivos de sistema
+
+.DS_Store
+Thumbs.db
+.env
