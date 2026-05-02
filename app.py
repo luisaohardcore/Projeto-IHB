@@ -77,10 +77,9 @@ def chamar_mentor_groq(pergunta_usuario, contexto_biblico="", modo_motivacao=Fal
 
     REGRAS:
     1. Se não houver contexto, responda de forma normal, como faria em uma conversa casual.
-    2. Se a resposta NÃO estiver no contexto, diga: "Não encontrei uma passagem específica sobre isso agora."
-    3. Use tom de conversa casual.
-    4. Não se estenda muito. Utilize de 3 a 4 parágrafos no máximo para concluir seu raciocínio.
-    5. Caso a conversa não esteja atrelada a assuntos bíblicos, aja como agiria naturalmente.
+    2. Use tom de conversa casual.
+    3. Não se estenda muito. Utilize de 3 a 4 parágrafos no máximo para concluir seu raciocínio.
+    4. Caso a conversa não esteja atrelada a assuntos bíblicos, aja como agiria naturalmente.
 
     CONTEXTO BÍBLICO:
     {contexto_biblico if contexto_biblico else "Use sua base teológica geral."}
