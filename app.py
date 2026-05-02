@@ -49,71 +49,69 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. CONFIGURAÇÃO DA IA (Groq Cloud) ---
-# Substitua o valor abaixo pela sua API Key real
-GROQ_API_KEY = "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"
+# A chave foi removida para segurança. 
+# No Streamlit Cloud, adicione GROQ_API_KEY em "Secrets".
+GROQ_API_KEY = ""
 
-with st.sidebar:
-    st.title("⚙️ Configurações")
-    
-    # Dicionário de modelos para facilitar a troca
-    modelos_disponiveis = {
-        "Llama 3.3 70B (Equilibrado)": "llama-3.3-70b-versatile",
-        "DeepSeek R1 (Raciocínio)": "deepseek-r1-distill-llama-70b",
-        "Llama 3.1 8B (Instantâneo)": "llama-3.1-8b-instant",
-        "Mixtral 8x7B (Versátil)": "mixtral-8x7b-32768"
-    }
-    
-    modelo_selecionado = st.selectbox(
-        "Escolha o modelo de IA:",
-        options=list(modelos_disponiveis.keys()),
-        index=0
-    )
-    
-    id_modelo = modelos_disponiveis[modelo_selecionado]
-    st.markdown("---")
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    else:
+        # Fallback para variável de ambiente local
+        GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+except Exception:
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+
+# Modelo fixo para maior estabilidade
+ID_MODELO_PADRAO = "llama-3.3-70b-versatile"
 
 def chamar_mentor_groq(pergunta_usuario, contexto_biblico="", modo_motivacao=False):
-    if not GROQ_API_KEY or GROQ_API_KEY == "SUA_CHAVE_AQUI":
-        return "Erro: A API Key do Groq não foi configurada corretamente no código."
+    if not GROQ_API_KEY:
+        return "Erro: API Key não configurada. Configure a GROQ_API_KEY nos Secrets do Streamlit ou variáveis de ambiente."
 
     client = Groq(api_key=GROQ_API_KEY)
     
     prompt_sistema = f"""
-    Você é um Mentor Bíblico sábio, empático e direto.
-    Responda sempre em Português Brasileiro.
-    Use o CONTEXTO BÍBLICO abaixo para enriquecer sua resposta, mas não se limite a ele.
-    Seja pastoral, evite repetições desnecessárias e procure variar as citações bíblicas.
-    
+    [INSTRUÇÃO CRÍTICA]
+    Você é um Mentor Bíblico focado em fatos. Sua base é o CONTEXTO BÍBLICO abaixo.
+
+    REGRAS:
+    1. Se não houver contexto, responda de forma normal, como faria em uma conversa casual.
+    2. Se a resposta NÃO estiver no contexto, diga: "Não encontrei uma passagem específica sobre isso agora."
+    3. Use tom de conversa casual.
+    4. Não se estenda muito. Utilize de 3 a 4 parágrafos no máximo para concluir seu raciocínio.
+    5. Caso a conversa não esteja atrelada a assuntos bíblicos, aja como agiria naturalmente.
+
     CONTEXTO BÍBLICO:
-    {contexto_biblico if contexto_biblico else "Use sua base teológica geral de diversos livros bíblicos."}
+    {contexto_biblico if contexto_biblico else "Use sua base teológica geral."}
     """
 
     if modo_motivacao:
-        prompt_sistema = "Gere uma frase curta e impactante de motivação cristã. Seja criativo."
+        prompt_sistema = "Gere uma frase curta e impactante de motivação cristã baseada em princípios bíblicos."
 
     try:
         completion = client.chat.completions.create(
-            model=id_modelo, 
+            model=ID_MODELO_PADRAO, 
             messages=[
                 {"role": "system", "content": prompt_sistema},
                 {"role": "user", "content": pergunta_usuario}
             ],
-            temperature=0.7,
-            max_tokens=500,
-            top_p=1,
-            stream=False,
+            temperature=0.6,
+            max_tokens=1024,
         )
         return completion.choices[0].message.content
     except Exception as e:
-        return f"Erro na conexão com a nuvem ({modelo_selecionado}): {str(e)}"
+        return f"Erro na conexão com o serviço de IA: {str(e)}"
 
 # --- 3. DADOS LOCAIS (Bíblia) ---
 @st.cache_data(show_spinner=False)
 def carregar_biblia():
     try:
-        if os.path.exists('pt_almeida.json'):
-            with open('pt_almeida.json', 'r', encoding='utf-8-sig') as f:
-                return json.load(f)
+        caminhos = ['pt_almeida.json', './pt_almeida.json']
+        for p in caminhos:
+            if os.path.exists(p):
+                with open(p, 'r', encoding='utf-8-sig') as f:
+                    return json.load(f)
         return []
     except Exception:
         return []
@@ -144,14 +142,15 @@ with st.sidebar:
     st.title("📖 Mentor UNASP")
     opcao = st.radio("Menu Principal:", ("Conversar", "Versículo do Dia", "Motivação"))
     st.markdown("---")
-    st.caption(f"Status: Ativo com {modelo_selecionado}")
+    st.caption("Motor: Llama 3.3 70B")
+    st.caption("Status: Online")
 
 if opcao == "Conversar":
     st.header("🔍 Consultoria Pastoral")
     if prompt := st.chat_input("Como posso ajudar hoje?"):
         st.chat_message("user").write(prompt)
         contexto = buscar_versiculos(prompt)
-        with st.spinner(f"O Mentor ({modelo_selecionado}) está processando..."):
+        with st.spinner(f"O Mentor está processando..."):
             resposta = chamar_mentor_groq(prompt, contexto)
             st.chat_message("assistant").write(resposta)
 
@@ -159,22 +158,37 @@ elif opcao == "Versículo do Dia":
     st.header("📖 Palavra de Hoje")
     CACHE_FILE = "cache_v.json"
     hoje = str(datetime.date.today())
+    
+    versiculo_exibir = None
 
     if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, "r") as f:
-            c = json.load(f)
-            if c["data"] == hoje:
-                st.info(f"**{c['ref']}**\n\n*{c['txt']}*")
-    else:
+        try:
+            with open(CACHE_FILE, "r") as f:
+                c = json.load(f)
+                if c.get("data") == hoje:
+                    versiculo_exibir = c
+        except:
+            pass
+
+    if not versiculo_exibir:
         if biblia:
-            l = random.choice(biblia)
-            nc = random.randrange(len(l['chapters']))
-            nv = random.randrange(len(l['chapters'][nc]))
-            txt = l['chapters'][nc][nv]
-            ref = f"{l['name']} {nc+1}:{nv+1}"
-            with open(CACHE_FILE, "w") as f:
-                json.dump({"data": hoje, "ref": ref, "txt": txt}, f)
-            st.rerun()
+            try:
+                l = random.choice(biblia)
+                nc = random.randrange(len(l['chapters']))
+                nv = random.randrange(len(l['chapters'][nc]))
+                txt = l['chapters'][nc][nv]
+                ref = f"{l['name']} {nc+1}:{nv+1}"
+                versiculo_exibir = {"data": hoje, "ref": ref, "txt": txt}
+                
+                with open(CACHE_FILE, "w") as f:
+                    json.dump(versiculo_exibir, f)
+            except Exception as e:
+                st.error(f"Erro ao selecionar versículo: {e}")
+        else:
+            st.warning("A base de dados da Bíblia não foi encontrada.")
+
+    if versiculo_exibir:
+        st.info(f"**{versiculo_exibir['ref']}**\n\n*{versiculo_exibir['txt']}*")
 
 elif opcao == "Motivação":
     st.header("💪 Ânimo e Fé")
